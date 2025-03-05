@@ -1,0 +1,109 @@
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+class WorkEntry {
+    String pic;
+    String date;
+    int hours;
+
+    public WorkEntry(String pic, String date, int hours) {
+        this.pic = pic;
+        this.date = date;
+        this.hours = hours;
+    }
+}
+
+public class GroupByPicOptimized {
+    private static final Set<String> HOLIDAYS = new HashSet<>(Arrays.asList(
+        "2024-04-30", "2024-05-01", "2024-09-02" // Thêm ngày lễ vào đây
+    ));
+
+    public static void main(String[] args) {
+        List<WorkEntry> data = Arrays.asList(
+            new WorkEntry("A", "2024-03-01", 5),
+            new WorkEntry("A", "2024-03-02", 6),
+            new WorkEntry("B", "2024-03-01", 4),
+            new WorkEntry("A", "2024-03-01", 6),
+            new WorkEntry("B", "2024-03-02", 6),
+            new WorkEntry("A", "2024-03-03", 7)
+        );
+
+        Map<String, TreeMap<String, Integer>> groupedData = new HashMap<>();
+
+        // Nhóm dữ liệu theo PIC -> Date -> Tổng Hours
+        for (WorkEntry entry : data) {
+            groupedData
+                .computeIfAbsent(entry.pic, k -> new TreeMap<>())
+                .merge(entry.date, entry.hours, Integer::sum);
+        }
+
+        // Phân bổ lại giờ nếu ngày nào vượt quá 8 tiếng
+        for (Map.Entry<String, TreeMap<String, Integer>> picEntry : groupedData.entrySet()) {
+            String pic = picEntry.getKey();
+            TreeMap<String, Integer> dates = picEntry.getValue();
+            List<String> sortedDates = new ArrayList<>(dates.keySet());
+
+            for (int i = 0; i < sortedDates.size(); i++) {
+                String date = sortedDates.get(i);
+                int hours = dates.get(date);
+
+                if (hours > 8) {
+                    int excessHours = hours - 8;
+                    dates.put(date, 8); // Giữ lại đúng 8 tiếng
+
+                    // Chuyển phần dư sang ngày hợp lệ tiếp theo
+                    String nextDate = findNextValidDate(date, dates);
+                    dates.put(nextDate, dates.getOrDefault(nextDate, 0) + excessHours);
+                    if (!sortedDates.contains(nextDate)) {
+                        sortedDates.add(nextDate);
+                        Collections.sort(sortedDates); // Sắp xếp lại danh sách ngày
+                    }
+                }
+            }
+        }
+
+        // In kết quả
+        groupedData.forEach((pic, dates) -> {
+            System.out.println("PIC: " + pic);
+            dates.forEach((date, totalHours) -> 
+                System.out.println("  Date: " + date + ", Total Hours: " + totalHours)
+            );
+        });
+    }
+
+    // Tìm ngày hợp lệ tiếp theo (không rơi vào cuối tuần hoặc ngày nghỉ lễ)
+    private static String findNextValidDate(String date, Map<String, Integer> existingDates) {
+        String nextDate = date;
+        do {
+            nextDate = getNextDate(nextDate);
+        } while (isWeekendOrHoliday(nextDate));
+        return nextDate;
+    }
+
+    // Hàm kiểm tra ngày có phải cuối tuần hoặc ngày lễ không
+    private static boolean isWeekendOrHoliday(String date) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(sdf.parse(date));
+
+            int dayOfWeek = calendar.get(Calendar.DAY_OF_WEEK);
+            return dayOfWeek == Calendar.SATURDAY || dayOfWeek == Calendar.SUNDAY || HOLIDAYS.contains(date);
+        } catch (Exception e) {
+            return true; // Nếu lỗi, coi như ngày không hợp lệ
+        }
+    }
+
+    // Hàm lấy ngày tiếp theo (tăng ngày lên 1)
+    private static String getNextDate(String date) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(sdf.parse(date));
+            calendar.add(Calendar.DAY_OF_MONTH, 1);
+            return sdf.format(calendar.getTime());
+        } catch (Exception e) {
+            return date; // Trả về ngày cũ nếu lỗi
+        }
+    }
+}
