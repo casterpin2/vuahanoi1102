@@ -10,18 +10,18 @@ public static void main(String[] args) {
     );
 
     List<BreakEntry> breakData = Arrays.asList(
-            new BreakEntry("A", "2024-03-04", 3), // Ngày thường, nghỉ 3h -> làm 5h
-            new BreakEntry("B", "2024-03-07", 2)  // Ngày thường, nghỉ 2h -> làm 6h
+            new BreakEntry("A", "2024-03-04", "2024-03-05", 3), // Nghỉ 3h trong 2 ngày liên tiếp
+            new BreakEntry("B", "2024-03-07", "2024-03-08", 2)  // Nghỉ 2h trong 2 ngày
     );
 
     Set<LocalDate> holidays = new HashSet<>(Arrays.asList(
-            LocalDate.parse("2024-03-06"), // Ví dụ ngày nghỉ lễ
+            LocalDate.parse("2024-03-06"), // Ngày nghỉ lễ
             LocalDate.parse("2024-03-10")
     ));
 
     Map<String, TreeMap<LocalDate, Integer>> result = allocateWorkHours(workData, breakData, holidays);
 
-    // Hiển thị kết quả
+    // In kết quả
     for (Map.Entry<String, TreeMap<LocalDate, Integer>> entry : result.entrySet()) {
         System.out.println("PIC: " + entry.getKey());
         for (Map.Entry<LocalDate, Integer> dateEntry : entry.getValue().entrySet()) {
@@ -39,7 +39,11 @@ public static Map<String, TreeMap<LocalDate, Integer>> allocateWorkHours(
     Map<String, Map<LocalDate, Integer>> breakMap = new HashMap<>();
     for (BreakEntry b : breakData) {
         breakMap.putIfAbsent(b.pic, new HashMap<>());
-        breakMap.get(b.pic).put(b.date, b.breakHours);
+        LocalDate date = b.startDate;
+        while (!date.isAfter(b.endDate)) {
+            breakMap.get(b.pic).put(date, b.breakHoursPerDay);
+            date = date.plusDays(1);
+        }
     }
 
     // **2. Gộp giờ làm vào workHoursMap**
@@ -83,13 +87,17 @@ public static Map<String, TreeMap<LocalDate, Integer>> allocateWorkHours(
             int remainingHours = overflow.getValue();
 
             while (remainingHours > 0) {
-                // Nếu ngày tiếp theo là ngày nghỉ, nhảy qua ngày tiếp theo
+                // Nếu ngày tiếp theo là ngày nghỉ lễ, bỏ qua
                 while (holidays.contains(nextDate)) {
                     nextDate = nextDate.plusDays(1);
                 }
 
+                // Kiểm tra giờ nghỉ trong ngày tiếp theo
+                int breakHoursNextDay = breakMap.getOrDefault(pic, Collections.emptyMap()).getOrDefault(nextDate, 0);
+                int maxCanWork = 8 - breakHoursNextDay; // Giờ làm tối đa có thể thêm vào ngày này
+
                 int availableHours = dateHours.getOrDefault(nextDate, 0);
-                int maxCanAdd = Math.min(8 - availableHours, remainingHours);
+                int maxCanAdd = Math.min(maxCanWork - availableHours, remainingHours);
 
                 if (maxCanAdd > 0) {
                     dateHours.put(nextDate, availableHours + maxCanAdd);
