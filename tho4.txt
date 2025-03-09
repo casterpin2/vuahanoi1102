@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handsontable Tabs</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+    <style>
+        .tab {
+            display: none;
+        }
+
+        .tab.active {
+            display: block;
+        }
+
+        .tab-buttons button {
+            margin: 5px;
+        }
+
+        .handsontable-container {
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="tab-buttons">
+        <button onclick="openTab('tab1')">Tab 1</button>
+        <button onclick="openTab('tab2')">Tab 2</button>
+    </div>
+    <div id="tab1" class="tab active">
+        <div id="hotTable1" class="handsontable-container"></div>
+    </div>
+    <div id="tab2" class="tab">
+        <div id="hotTable2" class="handsontable-container"></div>
+    </div>
+
+    <script>
+        let hot1, hot2;
+
+        function openTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'tab1') {
+                renderTab1();
+            } else if (tabId === 'tab2') {
+                renderTab2();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            renderTab1();
+        });
+
+        function renderTab1() {
+            const container = document.getElementById('hotTable1');
+            if (hot1) {
+                hot1.destroy();
+            }
+            hot1 = new Handsontable(container, {
+                data: [["", "", ""], ["", "", ""]],
+                colHeaders: ["A", "B", "C"],
+                rowHeaders: true,
+                width: '100%',
+                height: 300,
+                licenseKey: 'non-commercial-and-evaluation'
+            });
+        }
+        function commentsRenderer(instance, td, row, col, prop, value, cellProperties) {
+            Handsontable.renderers.TextRenderer.apply(this, arguments);
+            console.log(col);
+      
+
+            if (td.innerHTML < 30 || td.innerHTML > 40) {
+                td.style.color = 'green';
+                td.style.background = 'yellow';
+            }
+            console.log(td);
+
+            td.innerHTML = '<div title="' + td.innerHTML + '">' + td.innerHTML + '</div>';
+
+        }
+        function isWeekend(date) {
+            const day = date.getDay(); // Lấy thứ của ngày (0 = Chủ nhật, 6 = Thứ 7)
+            return day === 0 || day === 6;
+        }
+        function renderTab2() {
+            const container = document.getElementById('hotTable2');
+            if (hot2) {
+                hot2.destroy();
+            }
+            const today = new Date();
+            const daysRange = 20;
+            const startDate = new Date();
+            startDate.setDate(today.getDate() - 50);
+            const endDate = new Date();
+            endDate.setDate(today.getDate() + 50);
+
+            function formatDate(date) {
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            }
+
+            const dateList = [];
+            let currentDate = new Date(startDate);
+            while (currentDate <= endDate) {
+                dateList.push(formatDate(currentDate));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            const minDate = new Date();
+            minDate.setDate(today.getDate() - daysRange);
+            const maxDate = new Date();
+            maxDate.setDate(today.getDate() + daysRange);
+
+            let todayColumnIndex = -1;
+            dateList.forEach((date, index) => {
+                const dateObj = new Date(date);
+                if (dateObj.toDateString() === today.toDateString()) {
+                    todayColumnIndex = index + 4;
+                }
+            });
+
+            const colHeaders = ['Member', 'Total1', 'Total2', 'Total3', ...dateList];
+
+            const data = Array.from({ length: 10 }, (_, i) => [
+                `User ${i + 1}`, 100, 200, 300, ...dateList.map(() => Math.floor(Math.random() * 100))
+            ]);
+
+            hot2 = new Handsontable(container, {
+                data,
+                colHeaders,
+                rowHeaders: true,
+                stretchH: 'all',
+                colWidths: 90,
+                manualColumnMove: true,
+                autoColumnSize: true,
+                viewportColumnRenderingOffset: 50,
+                fixedColumnsStart: 4,
+                dropdownMenu: {
+                    items: {
+                        'filter_by_condition': { name: 'Filter by condition', disabled: function () { return this.getSelectedLast()[1] !== 0; } },
+                        'filter_by_value': { name: 'Filter by value', disabled: function () { return this.getSelectedLast()[1] !== 0; } },
+                        'filter_action_bar': { name: 'OK & Cancel', disabled: function () { return this.getSelectedLast()[1] !== 0; } },
+                        'clear_column': {},
+                        'hseparator1': '---------',
+                        'undo': {},
+                        'redo': {}
+                    }
+                },
+                filters: true,
+                columnSorting: true,
+                columns: [
+                    { data: 0, type: 'text', allowInvalid: false }, // Chỉ cột "Member" có filter
+                    { data: 1, type: 'numeric' },
+                    { data: 2, type: 'numeric' },
+                    { data: 3, type: 'numeric' },
+                    ...dateList.map(() => ({ type: 'numeric' }))
+                ],
+                afterGetColHeader(col, TH) {
+                    if (col !== 0) {
+                        const button = TH.querySelector('.changeType');
+
+                        if (!button) {
+                            return;
+                        }
+
+                        button.parentElement.removeChild(button);
+                    }
+                },
+                cells: function (row, col) {
+                    var cellProperties = {};
+                    if (col != 0) {
+                        cellProperties.renderer = commentsRenderer
+                    }
+
+                    return cellProperties;
+                },
+                licenseKey: 'non-commercial-and-evaluation'
+            });
+
+
+            setTimeout(() => {
+                if (todayColumnIndex !== -1) {
+                    hot2.scrollViewportTo(0, todayColumnIndex);
+                }
+            }, 300);
+
+        }
+
+    </script>
+</body>
+
+</html>
